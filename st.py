@@ -8,6 +8,8 @@ from keras.layers import LSTM
 import numpy as np
 import keras
 import numpy
+import time
+import altair as alt
 
 speaker_changed_seg = []
 words = []
@@ -23,17 +25,17 @@ import webrtcvad
 def read_wave(path):
     with contextlib.closing(wave.open(path, 'rb')) as wf:
         num_channels = wf.getnchannels()
-        print(num_channels)
-        #assert num_channels == 1
+        #print(num_channels)
+        assert num_channels == 1
         sample_width = wf.getsampwidth()
-        print(sample_width)
+        #print(sample_width)
         assert sample_width == 2
         sample_rate = wf.getframerate()
-        print(sample_rate)
+        #print(sample_rate)
         assert sample_rate in (8000, 16000, 32000, 48000)
         # print("dada shob assert pass kore")
         pcm_data = wf.readframes(wf.getnframes())
-        print(pcm_data)
+        #print(pcm_data)
         return pcm_data, sample_rate
 
 
@@ -140,7 +142,7 @@ def multi_segmentation(file):
     norm_mfcc_delta2 = (mfcc_delta2 - np.mean(mfcc_delta2, axis=1, keepdims=True)) / np.std(mfcc_delta2, axis=1, keepdims=True)
 
     ac_feature = np.vstack((norm_mfcc, norm_mfcc_delta, norm_mfcc_delta2))
-    print(ac_feature.shape)
+    #print(ac_feature.shape)
 
     sub_seq_len = int(3.2 * sr / frame_shift)
     sub_seq_step = int(0.8 * sr / frame_shift)
@@ -154,10 +156,10 @@ def multi_segmentation(file):
         return np.vstack(sub_train_x), feature_len
 
     predict_x, feature_len = extract_feature()
-    print(predict_x.shape)
+    #print(predict_x.shape)
 
     predict_y = model.predict(predict_x)
-    print(predict_y.shape)
+    #print(predict_y.shape)
 
     score_acc = np.zeros((feature_len, 1))
     score_cnt = np.ones((feature_len, 1))
@@ -200,7 +202,7 @@ def multi_segmentation(file):
         plt.vlines(seg_point[i] / (float)(sr), -1, 1, colors="r", linestyles="dashed")
     plt.xlabel("Time/s")
     plt.ylabel("Speech Amp")
-    plt.grid(True)
+    #plt.grid(True)
     plt.show()
 
     return np.asarray(seg_point) / float(sr)
@@ -248,7 +250,7 @@ def spliting(seg,arr):
   for i in range(len(arr1)):
     size=len(arr1[i])
     if size>=3:
-      arr1[i].pop(-2) if arr1[i][-1]-arr1[i][-2]<0.2 else True
+      arr1[i].pop(-2) #if arr1[i][-1]-arr1[i][-2]<0.2 else True
       
   return arr1
   
@@ -379,7 +381,7 @@ def hypothesis_gen(hyp_df):
       i = i+1
     y= hyp_rec[i][2]
         
-    print(i,x,y,"speaker: " + hyp_rec[i][0])
+    #print(i,x,y,"speaker: " + hyp_rec[i][0])
     speaker_changed_seg.append([hyp_rec[i][0],x,y])
     hypothesis[Segment(x, y)] = hyp_rec[i][0]
     i = i+1
@@ -393,6 +395,7 @@ def hypothesis_gen(hyp_df):
 #Diarization 
 from sklearn import preprocessing
 import pandas as pd
+@st.cache_data
 def diarization(audiofile):
     voice = fxn(audiofile)
     segmented = multi_segmentation(audiofile)
@@ -409,7 +412,7 @@ def diarization(audiofile):
     lb = preprocessing.LabelEncoder()
     label_hyp = lb.fit(label_list)
     speaker_id = lb.inverse_transform(speak_id)
-    hyp_df = pd.DataFrame({'Speaker_id': speaker_id,'Offset': resegmented[:, 0], 'end': resegmented[:, 1]})
+    hyp_df = pd.DataFrame({'Speaker id': speaker_id,'Offset (seconds)': resegmented[:, 0], 'end (seconds)': resegmented[:, 1]})
     result_hypo = hypothesis_gen(hyp_df)  
     return segmented, n_speakers, hyp_df, result_hypo
 
@@ -422,7 +425,7 @@ def diarization(audiofile):
 
 
 # Set app title
-st.title('Speaker Diarization')
+st.title('🎙️:blue[Bangla Speaker Diarization]')
 
 # Add file upload widget
 inputfile = st.file_uploader('Upload an audio file', type=['wav', 'mp3'])
@@ -430,10 +433,48 @@ inputfile = st.file_uploader('Upload an audio file', type=['wav', 'mp3'])
 # Add button to trigger speaker diarization
 if st.button('Perform Speaker Diarization'):
     # Perform speaker diarization on the uploaded audio file
-    segmented, n_clusters, hyp_df, result_hypo = diarization('bangaleeMuslim_s.wav')
-
+    #segmented, n_clusters, hyp_df, result_hypo = diarization('bangaleeMuslim_4.5.wav')
+    segmented, n_clusters, hyp_df, result_hypo = diarization(inputfile.name)
+    with st.spinner("Processing..."):
+      time.sleep(1)
+      st.markdown("**:green[Successfully Done!]**")
+    n=str(n_clusters)
     # Display the predicted speaker labels
-    st.write('Segmentation:', segmented)
-    st.write('Number of speakers:', n_clusters)
-    st.write('Speaker id, Offset and End:', hyp_df)
-    st.write('Predicted Speaker Labels:', result_hypo)
+    st.header('Segmentation')
+    st.dataframe(segmented, width=500)
+    st.write('Number of Speakers: ', n)
+    st.subheader(n)
+    st.header('Speaker id with Start Time and End Time')
+    st.dataframe(hyp_df, width=500)
+    st.header('Predicted Speaker Labels')
+    st.write(result_hypo)
+
+    timeline = result_hypo.get_timeline()
+
+    duration = [] 
+
+    for segment in timeline:
+      start_time = segment.start
+      end_time = segment.end
+      duration.append(end_time - start_time)
+
+    fig1, ax1 = plt.subplots()
+    ax1.pie(duration)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    st.pyplot(fig1)
+    from streamlit_timeline import timeline
+
+    alt.themes.enable("streamlit")
+    chart = alt.Chart(hyp_df, title='ki dibo title?').mark_point().encode(x=alt.X('Offset (seconds)', title='Time (s)'), 
+                      y=alt.Y('Speaker id', title='Speaker id'), tooltip=['Speaker id'],
+                      color=alt.Color('Speaker id', scale=alt.Scale(scheme='dark2')))
+    st.altair_chart(chart, theme="streamlit", use_container_width=True)
+    #timeline=timeline(result_hypo)
+    ##st.write(timeline)
+    #st.line_chart(fig1)
+    # st.bar_chart(fig1)
+    #st.area_chart(fig1)
+    #st.line_chart(result_hypo)
+    #st.cache_data.clear()
+
