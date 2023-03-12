@@ -7,4 +7,5 @@ pandas==1.5.0
 scikit_learn==1.2.2
 streamlit==1.20.0
 streamlit_timeline==0.0.2
+tensorflow-intel==2.11.0
 webrtcvad==2.0.10
