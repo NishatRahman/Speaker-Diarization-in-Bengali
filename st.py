@@ -124,7 +124,7 @@ model.add(TimeDistributed(Dense(1, activation='sigmoid')))
 model.build(input_shape=(None, 137, 35))
 model.summary()
 #Upload the pre-trained model file from Google Drive. Change the Path accordingly.
-h5_model_file = 'C:/Users/HP/Downloads/di/model_bangla_2.h5'
+h5_model_file = '/model_bangla_2.h5'
 model.load_weights(h5_model_file)
 
 
